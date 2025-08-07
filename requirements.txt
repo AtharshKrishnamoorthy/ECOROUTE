@@ -1,0 +1,8 @@
+agno
+requests
+fastapi
+uvicorn 
+streamlit
+google-genai
+sqlalchemy
+linkup-sdk
