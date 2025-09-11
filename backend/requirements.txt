@@ -1,0 +1,8 @@
+agno==1.8.2
+requests
+fastapi
+uvicorn 
+streamlit
+google-genai
+sqlalchemy
+linkup-sdk
