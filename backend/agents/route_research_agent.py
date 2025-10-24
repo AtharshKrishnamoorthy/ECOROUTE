@@ -9,7 +9,6 @@ from agno.agent import Agent,RunResponse
 from agno.models.google import Gemini
 from agno.storage.sqlite import SqliteStorage
 from agno.tools.linkup import LinkupTools
-from agno.tools.brightdata import BrightDataTools
 from dotenv import load_dotenv, find_dotenv
 
 # Env variables
@@ -31,7 +30,7 @@ def create_route_research_agent():
             db_file="agent_storage/route_research_agent.db",
             table_name="route_research_sessions"
         ),
-        tools=[LinkupTools(depth="deep"), BrightDataTools()],
+        tools=[LinkupTools()],
         instructions=[
             "You are a route research agent. Your job is to analyze routes and score them based on user parameters.",
             "You will receive route data from the previous step and user parameters from the original message.",
@@ -39,7 +38,7 @@ def create_route_research_agent():
             "Extract user parameters from the message (low traffic, eco-friendliness, charging stations, etc.).",
             "",
             "For each route provided, you must:",
-            "1. Use LinkupTools and BrightDataTools to research:",
+            "1. Use LinkupTools to research:",
             "   - Traffic patterns for major roads mentioned in the route",
             "   - EV charging infrastructure along the route",
             "   - Environmental factors and fuel efficiency",
@@ -52,6 +51,7 @@ def create_route_research_agent():
             "   - Parameter Scores:",
             "     * [Parameter]: [Score]/100 - [Web research justification]",
             "   - Key Findings: [important discoveries]",
+            "   - Route path : The basic arrow path of the route with main roads in it",
             "",
             "Always analyze the routes provided in the previous step. Do not ask for route information.",
         ],

@@ -20,7 +20,7 @@ def create_suggestion_agent():
         role="You are a route recommendation specialist that provides clear, concise travel suggestions based on route analysis.",
         description="I analyze route research data and provide neat, actionable recommendations to help users make the best travel decisions.",
         model=Gemini(
-            id="gemini-2.5-pro",
+            id="gemini-2.0-flash-lite",
             temperature=0.3
         ),
         storage=SqliteStorage(
@@ -41,6 +41,9 @@ def create_suggestion_agent():
             "## 🎯 ROUTE RECOMMENDATION",
             "",
             "**RECOMMENDED ROUTE: Route [Number]**",
+            "",
+            "### 🗺️ Route Path:",
+            "- [Basic arrow path of the route with main roads]",
             "",
             "### ✅ Why This Route:",
             "- [Key advantage from scores]",

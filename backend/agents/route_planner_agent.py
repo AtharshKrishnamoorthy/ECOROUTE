@@ -23,7 +23,7 @@ def create_route_planner_agent():
         role="You are an intelligent route planner that analyzes and presents optimal travel routes with comprehensive route information.",
         description="I analyze multiple route options and provide clear, actionable travel recommendations with distance, time, and turn-by-turn guidance.",
         model=Gemini(
-            id="gemini-2.0-flash-exp",
+            id="gemini-2.0-flash-lite",
             temperature=0.3
         ),
         storage=SqliteStorage(
