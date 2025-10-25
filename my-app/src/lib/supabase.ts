@@ -5,9 +5,37 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Singleton Supabase client instance to maintain consistent session across components
+let supabaseInstance: ReturnType<typeof createSupabaseClient> | null = null
+
 // Client-side Supabase client
 export const createClient = () => {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+  // Only create client on client-side to avoid SSR issues
+  if (typeof window === 'undefined') {
+    // Return a dummy client on server-side (won't be used for auth)
+    return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      }
+    })
+  }
+
+  // Create singleton client on client-side
+  if (!supabaseInstance) {
+    console.log('🔧 Creating new Supabase client instance');
+    supabaseInstance = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: 'ecoroute-auth-token',
+        flowType: 'pkce',
+      }
+    })
+  }
+  return supabaseInstance
 }
 
 // Auth helper functions

@@ -20,6 +20,9 @@ interface User {
   app_metadata?: {
     [key: string]: any;
   };
+  created_at?: string;
+  last_sign_in_at?: string;
+  email_confirmed_at?: string;
 }
 
 interface AuthContextType {
@@ -37,6 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const router = useRouter();
 
   const refreshUser = async () => {
@@ -51,43 +55,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+    let hasNavigated = false;
+    const supabase = createClient();
+
     const getInitialUser = async () => {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
+        // First check session from storage
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user && mounted) {
+          setUser(session.user);
+          console.log('✅ Session restored from storage:', session.user.email);
+        } else if (mounted) {
+          // If no session in storage, try to get user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            setUser(user);
+            console.log('✅ User fetched:', user.email);
+          } else {
+            setUser(null);
+            console.log('❌ No user found');
+          }
+        }
       } catch (error) {
-        console.error('Error getting initial user:', error);
+        console.error('❌ Error getting initial user:', error);
+        if (mounted) setUser(null);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
       }
     };
 
     getInitialUser();
 
-    // Listen for auth state changes with real Supabase client
-    const supabase = createClient();
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
+        console.log('🔔 Auth state change:', event, session?.user?.email || 'no user');
         
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (!mounted) return;
+
+        // Update user state for all events with a session
+        if (session?.user) {
           setUser(session.user);
+          console.log('✅ User state updated from event:', event);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          console.log('❌ User signed out');
+        }
+
+        // Handle navigation ONLY for explicit sign in/out events
+        if (event === 'SIGNED_IN' && session?.user && !hasNavigated) {
+          hasNavigated = true;
           toast.success('Welcome back!');
-          // Small delay to ensure auth state is set
           setTimeout(() => {
             router.push('/dashboard/main/home');
           }, 100);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
+        } else if (event === 'SIGNED_OUT' && !hasNavigated) {
+          hasNavigated = true;
           toast.success('Signed out successfully');
-          router.push('/dashboard/auth/signin');
+          setTimeout(() => {
+            router.push('/dashboard/auth/signin');
+          }, 100);
         }
+        
         setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   const signIn = async (email: string, password: string) => {
@@ -178,15 +220,22 @@ export function useAuth() {
 export function useRequireAuth() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
   
   useEffect(() => {
     if (!loading && !user) {
-      // Redirect to sign in
-      router.push('/dashboard/auth/signin');
+      // Only redirect if we've confirmed there's no user after loading
+      setShouldRedirect(true);
+      const timer = setTimeout(() => {
+        router.push('/dashboard/auth/signin');
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (user) {
+      setShouldRedirect(false);
     }
   }, [user, loading, router]);
 
-  return { user, loading };
+  return { user, loading, shouldRedirect };
 }
 
 // Type guard for user
@@ -196,8 +245,20 @@ export function isAuthenticated(user: User | null): user is User {
 
 // Protected route wrapper component
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useRequireAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
+  useEffect(() => {
+    // Only redirect once if not authenticated after loading completes
+    if (!loading && !user && !hasRedirected) {
+      console.log('🔒 Protected route: No user, redirecting to sign in');
+      setHasRedirected(true);
+      router.push('/dashboard/auth/signin');
+    }
+  }, [loading, user, hasRedirected, router]);
+
+  // Show loading state while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-green-100">
@@ -209,9 +270,19 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If not authenticated after loading, show redirecting message
   if (!user) {
-    return null; // Will redirect via useRequireAuth
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-green-100">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-gray-600">Redirecting to sign in...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Render protected content only when authenticated
+  console.log('✅ Protected route: User authenticated, rendering content');
   return <>{children}</>;
 }

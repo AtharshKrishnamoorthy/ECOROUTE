@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { DashboardHeader, LoadingSpinner, ApiStatus } from '@/components/dashboard-components';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,6 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -33,7 +33,14 @@ import {
 } from 'lucide-react';
 import apiService, { JobStatusResponse } from '@/lib/apiservice';
 import { toast } from 'sonner';
-import SimpleMap from '@/components/simple-map';
+import RouteMap from '@/components/route-map';
+import { geocodeAndRoute, formatDistance, formatDuration, calculateCO2Savings, type RouteData } from '@/lib/geocoding';
+
+// Dynamically import ReactMarkdown to avoid SSR issues
+const ReactMarkdown = dynamic(() => import('react-markdown'), {
+  ssr: false,
+  loading: () => <div className="text-gray-400 animate-pulse">Loading markdown...</div>
+});
 
 interface RouteFormData {
   source: string;
@@ -70,6 +77,8 @@ export default function RoutePlannerPage() {
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [completedRoute, setCompletedRoute] = useState<any>(null);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [isLoadingMap, setIsLoadingMap] = useState(false);
 
   // Check API health and restore any ongoing jobs on component mount
   useEffect(() => {
@@ -199,6 +208,24 @@ export default function RoutePlannerPage() {
     setCurrentJob(null);
     setAnalysisResult(null);
     setCompletedRoute(null);
+    setIsLoadingMap(true);
+
+    // Fetch route data for map visualization in parallel
+    geocodeAndRoute(
+      formData.source, 
+      formData.destination, 
+      formData.transportMode.toLowerCase().includes('bike') ? 'bike' : 
+      formData.transportMode.toLowerCase().includes('walk') ? 'foot' : 'car'
+    ).then(route => {
+      if (route) {
+        setRouteData(route);
+        toast.success(`Route loaded: ${formatDistance(route.distance)}, ${formatDuration(route.duration)}`);
+      }
+    }).catch(err => {
+      console.error('Map route error:', err);
+    }).finally(() => {
+      setIsLoadingMap(false);
+    });
 
     // Prepare additional parameters
     const additionalParams: Record<string, any> = {
@@ -656,45 +683,117 @@ export default function RoutePlannerPage() {
                     <TabsTrigger value="metrics">Metrics</TabsTrigger>
                   </TabsList>
                   <TabsContent value="analysis" className="mt-4">
-                    <div className="max-h-96 overflow-y-auto">
-                      <Textarea
-                        value={analysisResult}
-                        readOnly
-                        className="min-h-64 text-sm resize-none border-0 p-0 focus-visible:ring-0"
-                      />
+                    <div className="max-h-96 overflow-y-auto prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>
+                        {analysisResult || '*No analysis available yet. Submit a route to generate AI analysis.*'}
+                      </ReactMarkdown>
                     </div>
                   </TabsContent>
                   <TabsContent value="map" className="mt-4">
                     <div className="space-y-4">
-                      <SimpleMap 
+                      <RouteMap 
                         source={formData.source}
                         destination={formData.destination}
-                        className="h-64"
+                        sourceCoords={routeData?.sourceCoords}
+                        destCoords={routeData?.destCoords}
+                        routeCoordinates={routeData?.routeCoordinates}
+                        className="h-96"
                       />
-                      <div className="text-sm text-gray-600 text-center">
-                        Route visualization between {formData.source} and {formData.destination}
-                        <br />
-                        <span className="text-xs">Full interactive maps coming soon with real route data</span>
-                      </div>
+                      {routeData && (
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="text-blue-600 font-medium">Distance</div>
+                            <div className="text-2xl font-bold text-blue-700">
+                              {formatDistance(routeData.distance)}
+                            </div>
+                          </div>
+                          <div className="bg-emerald-50 p-3 rounded-lg">
+                            <div className="text-emerald-600 font-medium">Duration</div>
+                            <div className="text-2xl font-bold text-emerald-700">
+                              {formatDuration(routeData.duration)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {!routeData && !isLoadingMap && formData.source && formData.destination && (
+                        <div className="text-center">
+                          <Button
+                            onClick={async () => {
+                              setIsLoadingMap(true);
+                              try {
+                                const route = await geocodeAndRoute(
+                                  formData.source,
+                                  formData.destination,
+                                  formData.transportMode?.toLowerCase().includes('bike') ? 'bike' :
+                                  formData.transportMode?.toLowerCase().includes('walk') ? 'foot' : 'car'
+                                );
+                                if (route) {
+                                  setRouteData(route);
+                                  toast.success('Route loaded successfully!');
+                                } else {
+                                  toast.error('Could not load route. Please check addresses.');
+                                }
+                              } catch (error) {
+                                console.error('Route loading error:', error);
+                                toast.error('Failed to load route');
+                              } finally {
+                                setIsLoadingMap(false);
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            Load Route on Map
+                          </Button>
+                        </div>
+                      )}
+                      {isLoadingMap && (
+                        <div className="text-sm text-gray-600 text-center flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          Loading route data...
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                   <TabsContent value="metrics" className="mt-4">
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-center">
-                        <div className="p-3 bg-emerald-50 rounded-lg">
-                          <Leaf className="w-6 h-6 mx-auto text-emerald-600 mb-1" />
-                          <div className="text-sm text-gray-600">Eco Score</div>
-                          <div className="text-lg font-semibold text-emerald-600">85/100</div>
+                      {routeData ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-emerald-50 rounded-lg text-center">
+                              <Leaf className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+                              <div className="text-sm text-gray-600">CO₂ Savings</div>
+                              <div className="text-2xl font-bold text-emerald-600">
+                                {calculateCO2Savings(routeData.distance, formData.transportMode, formData.routePriority).toFixed(2)} kg
+                              </div>
+                            </div>
+                            <div className="p-4 bg-blue-50 rounded-lg text-center">
+                              <BarChart3 className="w-8 h-8 mx-auto text-blue-600 mb-2" />
+                              <div className="text-sm text-gray-600">Eco Score</div>
+                              <div className="text-2xl font-bold text-blue-600">
+                                {formData.routePriority.toLowerCase().includes('eco') ? '95' : '78'}/100
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 text-center text-sm">
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <div className="text-gray-600">Distance</div>
+                              <div className="font-semibold text-gray-900">{formatDistance(routeData.distance)}</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <div className="text-gray-600">Duration</div>
+                              <div className="font-semibold text-gray-900">{formatDuration(routeData.duration)}</div>
+                            </div>
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <div className="text-gray-600">Mode</div>
+                              <div className="font-semibold text-gray-900">{formData.transportMode}</div>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center text-gray-500 py-8">
+                          Route metrics will appear here once the route is calculated
                         </div>
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                          <BarChart3 className="w-6 h-6 mx-auto text-blue-600 mb-1" />
-                          <div className="text-sm text-gray-600">Efficiency</div>
-                          <div className="text-lg font-semibold text-blue-600">92%</div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500 text-center">
-                        Detailed metrics based on AI analysis
-                      </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>

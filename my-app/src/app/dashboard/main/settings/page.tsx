@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-components';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,10 +61,12 @@ interface UserSettings {
 }
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  
   const [settings, setSettings] = useState<UserSettings>({
-    // Profile
-    name: 'John Doe',
-    email: 'john.doe@example.com',
+    // Profile - will be populated from user data
+    name: '',
+    email: '',
     
     // Preferences
     defaultTransport: 'Car',
@@ -89,6 +92,17 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
+  // Load user data when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      setSettings(prev => ({
+        ...prev,
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        email: user.email || '',
+      }));
+    }
+  }, [user]);
+
   const handleSettingChange = (key: keyof UserSettings, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     setIsDirty(true);
@@ -110,8 +124,8 @@ export default function SettingsPage() {
 
   const resetToDefaults = () => {
     setSettings({
-      name: 'John Doe',
-      email: 'john.doe@example.com',
+      name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User',
+      email: user?.email || '',
       defaultTransport: 'Car',
       defaultPriority: 'Eco-Friendly',
       units: 'metric',
@@ -241,15 +255,57 @@ export default function SettingsPage() {
               </div>
               
               <div className="pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Account Status</h4>
-                    <p className="text-sm text-gray-500">Free Plan - AI-powered route planning</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Account Status</h4>
+                      <p className="text-sm text-gray-500">Free Plan - AI-powered route planning</p>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Upgrade Plan
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Upgrade Plan
-                  </Button>
+                  {user && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-600">User ID:</span>
+                        <p className="font-mono text-xs mt-1 text-gray-900 truncate">{user.id}</p>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-600">Member Since:</span>
+                        <p className="font-medium mt-1 text-gray-900">
+                          {new Date(user.created_at || '').toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-600">Last Sign In:</span>
+                        <p className="font-medium mt-1 text-gray-900">
+                          {user.last_sign_in_at 
+                            ? new Date(user.last_sign_in_at).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-gray-600">Email Verified:</span>
+                        <p className="font-medium mt-1">
+                          <Badge variant={user.email_confirmed_at ? "default" : "secondary"} className="text-xs">
+                            {user.email_confirmed_at ? '✓ Verified' : '✗ Not Verified'}
+                          </Badge>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

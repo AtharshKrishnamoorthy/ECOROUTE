@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const inter = Inter({
@@ -51,26 +52,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-white text-gray-900 font-sans`}
+        suppressHydrationWarning
       >
-        <div className="min-h-screen relative overflow-hidden">
-          {children}
-        </div>
-        <Toaster 
-          position="top-right"
-          richColors
-          closeButton
-          toastOptions={{
-            style: {
-              background: 'white',
-              border: '1px solid #e5e7eb',
-              color: '#374151',
-            },
-            className: 'font-sans',
-          }}
-        />
+        <Providers>
+          <div className="min-h-screen relative overflow-hidden">
+            {children}
+          </div>
+          <Toaster 
+            position="top-right"
+            richColors
+            closeButton
+            toastOptions={{
+              style: {
+                background: 'white',
+                border: '1px solid #e5e7eb',
+                color: '#374151',
+              },
+              className: 'font-sans',
+            }}
+          />
+        </Providers>
       </body>
     </html>
   );

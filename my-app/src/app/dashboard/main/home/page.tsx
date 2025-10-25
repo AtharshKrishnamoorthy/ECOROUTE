@@ -25,57 +25,57 @@ import {
 import apiService, { HealthStatus } from '@/lib/apiservice';
 import Link from 'next/link';
 
-// Mock data for development - replace with real data later
-const mockRoutes = [
-  {
-    source: 'Times Square, New York',
-    destination: 'Central Park, New York',
-    transport_mode: 'Bike',
-    route_priority: 'Eco-Friendly',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    ai_analysis: 'Optimized route with 25% CO2 reduction...'
-  },
-  {
-    source: 'San Francisco Airport',
-    destination: 'Golden Gate Bridge',
-    transport_mode: 'Public Transport',
-    route_priority: 'Fastest',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-    ai_analysis: 'Multi-modal route analysis complete...'
-  },
-  {
-    source: 'Los Angeles',
-    destination: 'Santa Monica',
-    transport_mode: 'Car',
-    route_priority: 'Scenic',
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-  }
-];
-
 export default function HomePage() {
   const [apiHealth, setApiHealth] = useState<HealthStatus | null>(null);
-  const [routes] = useState(mockRoutes); // Replace with real route data later
+  const [routes, setRoutes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Load real route history from localStorage
+    const loadRouteHistory = () => {
+      try {
+        const history = localStorage.getItem('ecoroute_history');
+        if (history) {
+          const parsedHistory = JSON.parse(history);
+          setRoutes(parsedHistory);
+        } else {
+          setRoutes([]);
+        }
+      } catch (error) {
+        console.error('Error loading route history:', error);
+        setRoutes([]);
+      }
+    };
+
     const checkApiHealth = async () => {
       setIsLoading(true);
       const health = await apiService.checkHealth();
       setApiHealth(health);
+      loadRouteHistory();
       setIsLoading(false);
     };
 
     checkApiHealth();
     
-    // Check API health every 30 seconds
-    const interval = setInterval(checkApiHealth, 30000);
+    // Check API health every 30 seconds and reload routes
+    const interval = setInterval(() => {
+      checkApiHealth();
+    }, 30000);
+    
     return () => clearInterval(interval);
   }, []);
 
+  // Calculate real metrics from actual route data
   const totalRoutes = routes.length;
   const aiAnalyzedRoutes = routes.filter(route => route.ai_analysis).length;
   const recentRoutes = routes.slice(0, 3);
-  const estimatedCO2Saved = totalRoutes * 2.5; // Mock calculation
+  
+  // Calculate actual CO2 saved from route data
+  const totalCO2Saved = routes.reduce((sum, route) => {
+    return sum + (route.co2_saved || 0);
+  }, 0);
+  
+  // Count unique transport modes used
   const transportModes = new Set(routes.map(route => route.transport_mode)).size;
 
   return (
@@ -122,7 +122,7 @@ export default function HomePage() {
         
         <MetricCard
           title="CO₂ Saved"
-          value={`${estimatedCO2Saved.toFixed(1)} kg`}
+          value={`${totalCO2Saved.toFixed(1)} kg`}
           icon={Leaf}
           description="vs. non-optimized routes"
           variant="success"
@@ -198,7 +198,7 @@ export default function HomePage() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">CO₂ Reduction</span>
                   <Badge variant="outline" className="bg-green-50 text-green-700">
-                    ~{(estimatedCO2Saved * 0.1).toFixed(1)}%
+                    ~{totalCO2Saved > 0 ? (totalCO2Saved * 0.1).toFixed(1) : '0.0'}%
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">

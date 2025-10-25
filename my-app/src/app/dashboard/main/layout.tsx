@@ -1,5 +1,5 @@
 import DashboardLayout from '@/components/dashboard-layout';
-import { AuthProvider, ProtectedRoute } from '@/lib/auth-context';
+import { ProtectedRoute } from '@/lib/auth-context';
 
 export default function MainLayout({
   children,
@@ -7,10 +7,8 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthProvider>
-      <ProtectedRoute>
-        <DashboardLayout>{children}</DashboardLayout>
-      </ProtectedRoute>
-    </AuthProvider>
+    <ProtectedRoute>
+      <DashboardLayout>{children}</DashboardLayout>
+    </ProtectedRoute>
   );
 }
