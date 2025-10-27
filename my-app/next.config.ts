@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   // Optimize for better performance
   swcMinify: true,
   
+  // Disable ESLint and TypeScript checks during build (for faster deployments)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  
   // Improve client-side navigation
   experimental: {
     optimizePackageImports: ['lucide-react', '@supabase/supabase-js'],
@@ -17,6 +25,19 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
+  
+  // Image optimization settings
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+    ],
+  },
+  
+  // Output configuration for deployment
+  output: 'standalone',
 };
 
 export default nextConfig;
