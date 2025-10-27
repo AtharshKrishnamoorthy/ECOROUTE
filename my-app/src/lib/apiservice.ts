@@ -1,7 +1,7 @@
 // API Service for EcoRoute FastAPI Backend Integration
 import { toast } from 'sonner';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ecoroute-qznc.onrender.com';
 
 // Types for API requests and responses
 export interface RouteRequest {
