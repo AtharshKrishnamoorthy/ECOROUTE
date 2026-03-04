@@ -162,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) {
         setUser(data.user);
         toast.success('Account created successfully!');
-        router.push('/dashboard/main/home');
+        router.push('/dashboard/auth/signin');
         return { success: true };
       }
       
